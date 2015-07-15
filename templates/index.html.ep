@@ -1,0 +1,27 @@
+<html>
+  <head>
+    <title>Nasa Climate Data pi</title>
+  </head>
+  <body>
+    <h1>Nasa Climate Data API</h1>
+    <h2>Available API endpoints</h2>
+    <h3>/api</h3>
+    <p>A catch-all endpoint which accepts GET arguments:</p>
+    <dl>
+      <dt>year</dt>
+      <dd>one or more years to return; > 1 years should be comma-separated</dd>
+      <dt>measures</dt>
+      <dd>one or more measures to return; > 1 measures should be comma-separated<br />Valid measures are: tasmin, tasmax, pr (pr yet to be implemented)</dd>
+      
+      <dt>latmin</dt>
+      <dd>latitude from which to retrieve data; if latmax is specified, this will be the minimum latitude defining the northern edge of the bounds</dd>
+      <dt>latmax</dt>
+      <dd>latitude to which to retrieve data; (optional); if provided, this specifies the southern edge of the bounds</dd>
+      
+      <dt>lonmin</dt>
+      <dd>longitude from which to retrieve data; if lonmax is specified, this will be the minimum longitude defining the western edge of the bounds</dd>
+      <dt>lonmax</dt>
+      <dd>longitude to which to retrieve data; (optional); if provided, this specifies the eastern edge of the bounds</dd>
+    </dl>
+  </body>
+</html>

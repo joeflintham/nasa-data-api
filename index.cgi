@@ -1,6 +1,7 @@
 #!/usr/bin/env perl
 use constant LIB_DIR => "../../perl5/lib/perl5";
-use constant DATA_DIR => "../../data/";
+use constant DATA_DIR => "../data/";
+use constant CLIENTREQ => "http://localhost:8000";
 
 use lib LIB_DIR;
 
@@ -12,6 +13,8 @@ use Data::Dump qw(dump);
 use Mojo::JSON qw(decode_json encode_json);
 use DateTime;
 use Try::Tiny;
+
+
 
 # local
 # TODO: farm out key processes to .pms  
@@ -55,6 +58,16 @@ get '/api' => sub {
     my $latMax = $c->param('latmax') || $latMin + 0.25;
     my $lonMax = $c->param('lonmax') || $lonMin + 0.25;
 
+    # the data ovecomes the meridian discontinuity by using a longitude range of 0 to 360
+    # however, we expect longitude to be queried using the -180 - 180 range
+    if ($lonMin < 0){
+        $lonMin = 360 + $lonMin; # e.g converts -1 to 359
+    }
+
+    if ($lonMax < 0){
+        $lonMax = 360 + $lonMax; # e.g. converts -179 to 181
+    }
+    
     # define the lat / lon grid used in the .nc files
     # these are normalised across the data set
     # so we are fairly secure in defining these wihtout the cost of loading a file to extract them
@@ -94,7 +107,7 @@ get '/api' => sub {
         # throw if the error is too big, set a hard floor of +1;
         my $x = $latMaxPos - $latMinPos;
         my $y = $lonMaxPos - $lonMinPos;
-        
+
         if ($x * $y > 225) { # a grid of 15 * 15
             Mojo::Exception->throw("Lat / lon grid too big (max 225 cells)");
         }
@@ -138,7 +151,7 @@ get '/api' => sub {
                 
                 # turn it into nested array references 
                 my @values = unpdl $values;
-                
+
                 # iterate through all the days
                 my $i = 0;
                 while ($i < $days){
@@ -176,19 +189,40 @@ get '/api' => sub {
             }
         }
         
+        my $latMinOut = $lats[$latMinPos];       # lx = left lat
+        my $lonMinOut = $lons[$lonMinPos];       # ty = top lon
+        my $latMaxOut = $lats[$latMaxPos];       # rx = left lat
+        my $lonMaxOut = $lons[$lonMaxPos];;       # by = bottom lon
+
+        # this is metadata feedback - convert back from 0 - 360 to -180 to 180
+        if ($lonMinOut > 180){
+            $lonMinOut = $lonMinOut - 360;
+        }
+        
+        if ($lonMaxOut > 180){
+            $lonMaxOut = $lonMaxOut - 360;
+        }
+        
         # create a JSON repsonse with the data and include context metadata too
-        $data = encode_json {
+        $data = {
+            
             metadata => {
+                # TODO: add human readble metadata from inmcm4.ncml
                 "dimensions" => $x."x".$y,   # the shape of the measure matrix 
                 "granularity" => "0.25",     # the granularity of lat / lon coord system for this data
                 "period" => \@years,         # a list of one or more years represented by the data
                 "measures" => \@measures,    # a list of one or more measures represented by the data
-                "boundingbox" => [           # a list of the lat / lon coords specifying the outerbounds of the data (lx,ty/rx,by)
-                                             $lats[$latMinPos],       # lx = left lat
-                                             $lons[$lonMinPos],       # ty = top lon
-                                             $lats[$latMaxPos],       # rx = left lat
-                                             $lons[$lonMaxPos]        # by = bottom lon
-                    ]  
+                "boundingbox" => ($x > 1 || $y > 1) ? [           # a list of the lat / lon coords specifying the outerbounds of the data (lx,ty/rx,by)
+                                                                  $latMinOut,       # lx = left lat
+                                                                  $lonMinOut,       # ty = top lon
+                                                                  $latMaxOut,       # lx = right lat
+                                                                  $lonMaxOut,       # ty = bottom lon
+                    ] : null,
+                    "point" => ($x == 1 && $y == 1) ? [
+                        $latMinOut,       # lx = left lat
+                        $lonMinOut,       # ty = top lon
+                        
+                    ] : null  
             }, 
                     data => \%dataArray      # the data for this request 
         };
@@ -201,16 +235,11 @@ get '/api' => sub {
         };
     };
     
-    $c->render(resp => $data);
+    $c->res->headers->header('Access-Control-Allow-Origin' => CLIENTREQ);
+    $c->res->headers->header('Content-type' => 'application/json');
+    $c->render(json => $data);
     
 } => 'resp';
 
 
 app->start;
-__DATA__
-
-@@resp.html.ep
-<%= $resp %>
-
-@@index.html.ep
-<h1>Hello world</h1>
