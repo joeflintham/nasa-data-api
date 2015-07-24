@@ -97,6 +97,16 @@ get '/api' => sub {
     my $latMaxPos = int(floor(($latMax - (-90)) / 0.25));
     my $lonMaxPos = int(ceil(($lonMax) / 0.25));
 
+    
+    # some mapping applications will send longitudes that exceeds the 360 degrees normally expected
+    # e.g. leaflet when it displays > 1 earth
+    if ($lonMinPos < 0 || $lonMinPos > 1439) {
+        my $leftover = ($lonMinPos % 1440);
+        my $extent = $lonMaxPos - $lonMinPos;
+        $lonMinPos = ($leftover > 0) ? $leftover : 1440 - $leftover;
+        $lonMaxPos = $lonMinPos + $extent;
+    }
+
     # placeholder for data response objects
     my $data; # the JSON response for the data retrieved
     my %dataArray; # a hash list of data responses (the file name will be the key to each item)
